@@ -3,10 +3,18 @@ import express from 'express';
 import cors from 'cors';
 import OpenAI from 'openai';
 
+// Supported providers for BYO model
+const PROVIDERS = {
+  OPENAI: 'openai',
+  HTTP: 'http', // generic JSON POST endpoint that accepts {messages} and returns {reply}
+};
+
 // ---- config ----
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const MODEL = process.env.FINE_TUNED_MODEL || 'gpt-4o-mini';
 
 // Lazy OpenAI client init to avoid throwing when key is missing
 let openaiClient = null;
@@ -14,8 +22,7 @@ function getOpenAI() {
   if (openaiClient) return openaiClient;
   const key = String(process.env.OPENAI_API_KEY ?? '').trim();
   if (!key) {
-    console.warn('[WARN] No OPENAI_API_KEY provided. Enabling MOCK mode.');
-    MOCK = true;
+    console.warn('[WARN] No OPENAI_API_KEY provided.');
     return null;
   }
   try {
@@ -23,39 +30,57 @@ function getOpenAI() {
     return openaiClient;
   } catch (e) {
     console.error('Failed to initialize OpenAI client:', e?.message || e);
-    MOCK = true;
     return null;
   }
 }
 
-// parse MOCK once
-const initialMock = String(process.env.MOCK ?? '').trim().toLowerCase();
-let MOCK = ['1', 'true', 'yes', 'on'].includes(initialMock);
-console.log(`[mode] MOCK MODE: ${MOCK ? 'ON' : 'OFF'} (env MOCK="${process.env.MOCK ?? ''}")`);
-
-// ---- helpers reused from chat.js (inlined to avoid refactor) ----
-function mockReply(messages) {
-  let lastUser = '';
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m?.role === 'user') { lastUser = m.content ?? ''; break; }
-  }
-  return (
-    `[MOCK] Hey Yogev — pipeline works.\n` +
-    `Last user message: "${lastUser}"\n` +
-    `Answer: Your goal is to build a SaaS that lets you bring *your* private model into any conversation via a summarizing middleware.`
-  );
+function readProviderFromHeaders(req) {
+  // All optional; if not provided we fall back to env/OpenAI
+  const provider = String(req.get('x-llm-provider') || '').trim().toLowerCase();
+  const model = String(req.get('x-llm-model') || '').trim();
+  const apiKey = String(req.get('x-llm-api-key') || '').trim();
+  const endpoint = String(req.get('x-llm-endpoint') || '').trim();
+  return { provider, model, apiKey, endpoint };
 }
 
-async function callModel(messages) {
-  if (MOCK) return mockReply(messages);
+// ---- helpers reused from chat.js (inlined to avoid refactor) ----
+
+async function callModel(messages, req) {
+  // 1) Explicit per-request provider overrides (BYO model)
+  const { provider, model, apiKey, endpoint } = readProviderFromHeaders(req);
+
+  // 1a) Generic HTTP provider: POST to endpoint with {messages}
+  if (provider === PROVIDERS.HTTP && endpoint) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-llm-model': model || '' },
+        body: JSON.stringify({ messages })
+      });
+      if (!res.ok) throw new Error(`HTTP provider error ${res.status}`);
+      const json = await res.json();
+      return json.reply || json.content || json.output || '(no content)';
+    } catch (e) {
+      return "Provider error: " + (e?.message || e);
+    }
+  }
+
+  // 1b) OpenAI provider with per-request key/model
+  if (provider === PROVIDERS.OPENAI && apiKey) {
+    try {
+      const temp = new OpenAI({ apiKey });
+      const chosenModel = model || MODEL;
+      const completion = await temp.chat.completions.create({ model: chosenModel, messages });
+      return completion.choices[0]?.message?.content ?? '(no content)';
+    } catch (e) {
+      return "Provider error: " + (e?.message || e);
+    }
+  }
+
   const client = getOpenAI();
-  if (!client) return mockReply(messages);
+  if (!client) return "Server is not configured with an OpenAI key. Please provide one in the request headers.";
   try {
-    const completion = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages
-    });
+    const completion = await client.chat.completions.create({ model: MODEL, messages });
     return completion.choices[0]?.message?.content ?? '(no content)';
   } catch (err) {
     const msg = String(err?.message || '');
@@ -64,23 +89,15 @@ async function callModel(messages) {
     const errName = String(err?.name || '');
     const errType = String(err?.type || err?.error?.type || '');
     const quotaHit = (
-      statusNum === 429 ||
-      /rate[-_ ]?limit/i.test(errName) ||
-      /rate[-_ ]?limit/i.test(errType) ||
-      /insufficient[_-]?quota/i.test(errType) ||
-      /insufficient[_-]?quota/i.test(msg) ||
-      /exceeded your current quota/i.test(msg) ||
-      /quota/i.test(msg)
+      statusNum === 429 || /rate[-_ ]?limit/i.test(errName) || /rate[-_ ]?limit/i.test(errType) ||
+      /insufficient[_-]?quota/i.test(errType) || /insufficient[_-]?quota/i.test(msg) ||
+      /exceeded your current quota/i.test(msg) || /quota/i.test(msg)
     );
     if (quotaHit) {
-      console.warn(`[WARN] Quota/Rate-limit detected (${rawStatus || errName || errType}). Enabling MOCK mode.`);
-      MOCK = true;
-      return mockReply(messages);
+      return "Quota exceeded or rate limit hit. Please check your API key or usage.";
     }
     console.error('API call failed:', rawStatus ?? '', msg);
-    if (err?.response) {
-      try { console.error('Response body:', await err.response.text()); } catch {}
-    }
+    if (err?.response) { try { console.error('Response body:', await err.response.text()); } catch {} }
     throw err;
   }
 }
@@ -94,8 +111,8 @@ app.post('/chat', async (req, res) => {
       ? messages
       : [{ role: 'user', content: String(prompt ?? '').trim() || 'ping' }];
 
-    const reply = await callModel(msgs);
-    res.json({ ok: true, reply, mocked: MOCK });
+    const reply = await callModel(msgs, req);
+    res.json({ ok: true, reply });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
@@ -103,4 +120,4 @@ app.post('/chat', async (req, res) => {
 
 // ---- start ----
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`chat-hub listening on :${PORT} (MOCK=${MOCK ? 'ON' : 'OFF'})`));
+app.listen(PORT, () => console.log(`chat-hub listening on :${PORT} (MODEL=${MODEL}; defaultProvider=openai)`));
