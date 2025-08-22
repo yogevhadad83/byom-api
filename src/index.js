@@ -1,16 +1,9 @@
 import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
 import { PORT, MODEL } from './config.js';
+import app from './app.js';
 import healthRouter from './routes/health.js';
 import chatRouter from './routes/chat.js';
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-app.use('/', healthRouter);
-app.use('/', chatRouter);
+import providerRouter from './routes/provider.js';
 
 app.listen(PORT, () => {
   console.log(`chat-hub listening on :${PORT} (MODEL=${MODEL}; credentials required; no server default key)`);

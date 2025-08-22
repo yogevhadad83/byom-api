@@ -1,14 +1,33 @@
 import { MODEL as DEFAULT_MODEL } from '../config.js';
-import { dispatchProvider } from '../providers/index.js';
+import { dispatchProvider, readProviderFromHeaders } from '../providers/index.js';
+import { getProvider } from './agent.js';
 
-export async function callModel(messages, req) {
+export async function callModel(messages, req, opts = {}) {
   try {
-    const reply = await dispatchProvider({
-      defaultModel: DEFAULT_MODEL,
-      req,
-      messages,
-    });
-    return reply;
+    // First try header-supplied credentials
+    const hdr = readProviderFromHeaders(req);
+    const hasHeaderCfg = Boolean((hdr.provider && (hdr.apiKey || hdr.endpoint)) || hdr.apiKey || hdr.endpoint);
+    if (hasHeaderCfg) {
+      const reply = await dispatchProvider({ defaultModel: DEFAULT_MODEL, req, messages });
+      return reply;
+    }
+
+    // Otherwise, attempt per-user agent lookup
+    const bodyUserId = opts.userId || req?.body?.userId;
+    const headerUserId = req.get('x-user-id');
+    const userId = String(bodyUserId || headerUserId || '').trim();
+    if (userId) {
+      const cfg = getProvider(userId);
+      if (cfg) {
+        const reply = await dispatchProvider({ defaultModel: DEFAULT_MODEL, req, messages, overrideConfig: cfg });
+        return reply;
+      }
+    }
+
+    // No usable config found
+    const err = new Error('No provider configured for this user. Register a provider first.');
+    err.status = 400;
+    throw err;
   } catch (err) {
     const msg = String(err?.message || '');
     const rawStatus = err?.status ?? err?.response?.status ?? err?.code ?? err?.statusCode ?? null;
@@ -31,6 +50,11 @@ export async function callModel(messages, req) {
         console.error('Provider error response:', body);
       }
     } catch {}
+    // If it's our own friendly missing-provider error, bubble it
+    if (/No provider configured for this user/i.test(msg)) {
+      err.status = 400;
+      throw err;
+    }
     throw err;
   }
 }
