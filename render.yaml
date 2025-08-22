@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: chat-hub
+    env: node
+    region: oregon            # pick your closest region
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MOCK
+        value: "1"           # keep free until you enable billing
+    healthCheckPath: /
