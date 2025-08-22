@@ -8,7 +8,25 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Lazy OpenAI client init to avoid throwing when key is missing
+let openaiClient = null;
+function getOpenAI() {
+  if (openaiClient) return openaiClient;
+  const key = String(process.env.OPENAI_API_KEY ?? '').trim();
+  if (!key) {
+    console.warn('[WARN] No OPENAI_API_KEY provided. Enabling MOCK mode.');
+    MOCK = true;
+    return null;
+  }
+  try {
+    openaiClient = new OpenAI({ apiKey: key });
+    return openaiClient;
+  } catch (e) {
+    console.error('Failed to initialize OpenAI client:', e?.message || e);
+    MOCK = true;
+    return null;
+  }
+}
 
 // parse MOCK once
 const initialMock = String(process.env.MOCK ?? '').trim().toLowerCase();
@@ -31,8 +49,10 @@ function mockReply(messages) {
 
 async function callModel(messages) {
   if (MOCK) return mockReply(messages);
+  const client = getOpenAI();
+  if (!client) return mockReply(messages);
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       messages
     });
@@ -83,4 +103,4 @@ app.post('/chat', async (req, res) => {
 
 // ---- start ----
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`chat-hub listening on :${PORT}`));
+app.listen(PORT, () => console.log(`chat-hub listening on :${PORT} (MOCK=${MOCK ? 'ON' : 'OFF'})`));
