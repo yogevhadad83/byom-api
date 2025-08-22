@@ -1,6 +1,6 @@
 # Chat Hub SaaS – Node/Express + dynamic LLM provider
 
-A minimal Express server that supports a default OpenAI model plus per-request provider overrides via HTTP headers.
+A minimal Express server that requires per-request credentials and supports provider overrides via HTTP headers.
 
 ## Run locally
 
@@ -14,16 +14,23 @@ Server starts on PORT (default 3000) and exposes:
 - POST `/chat` → accepts `{ messages }` or `{ prompt }`
 
 ## Environment variables
-- `OPENAI_API_KEY` — default server OpenAI key (optional; required unless client overrides with headers)
 - `FINE_TUNED_MODEL` — default model name; defaults to `gpt-4o-mini`
 - `PORT` — optional port (defaults to 3000)
 
-## Provider override headers
-A client can override the default server provider/model per request by sending these headers:
-- `x-llm-provider` — `openai` or `http`
-- `x-llm-model` — model name to use for the request
-- `x-llm-api-key` — API key to override the default server key (used when provider=openai)
-- `x-llm-endpoint` — endpoint URL (used when provider=http). The server will POST `{ messages }` and expects one of `reply | content | output` in the JSON response.
+## Required headers
+Pick one of the following per request:
+
+OpenAI:
+- `x-llm-provider: openai` (or omit and include an API key)
+- `x-llm-api-key: <your-openai-key>`
+- `x-llm-model: <model>` (optional; defaults to `FINE_TUNED_MODEL`)
+
+Custom HTTP endpoint:
+- `x-llm-provider: http`
+- `x-llm-endpoint: https://...` (server will POST `{ messages }`)
+- `x-llm-model: <model>` (optional; forwarded in header)
+
+Without these headers, the server will return an error: missing provider credentials.
 
 ## Error behavior
 Quota/rate-limit errors are normalized to:

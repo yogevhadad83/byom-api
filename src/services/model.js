@@ -1,22 +1,9 @@
 import { MODEL as DEFAULT_MODEL } from '../config.js';
 import { dispatchProvider } from '../providers/index.js';
-import { makeOpenAIClient } from '../providers/openai.js';
-
-// Cached default OpenAI client using env var
-let defaultOpenAIClient = null;
-function getDefaultClient() {
-  if (defaultOpenAIClient) return defaultOpenAIClient;
-  const key = String(process.env.OPENAI_API_KEY || '').trim();
-  if (!key) return null;
-  defaultOpenAIClient = makeOpenAIClient(key);
-  return defaultOpenAIClient;
-}
 
 export async function callModel(messages, req) {
   try {
-    const client = getDefaultClient();
     const reply = await dispatchProvider({
-      defaultOpenAIClient: client,
       defaultModel: DEFAULT_MODEL,
       req,
       messages,

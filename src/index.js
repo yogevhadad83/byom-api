@@ -13,5 +13,5 @@ app.use('/', healthRouter);
 app.use('/', chatRouter);
 
 app.listen(PORT, () => {
-  console.log(`chat-hub listening on :${PORT} (MODEL=${MODEL}; defaultProvider=openai)`);
+  console.log(`chat-hub listening on :${PORT} (MODEL=${MODEL}; credentials required; no server default key)`);
 });

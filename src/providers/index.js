@@ -10,19 +10,22 @@ export function readProviderFromHeaders(req) {
   return { provider, model, apiKey, endpoint };
 }
 
-export async function dispatchProvider({ defaultOpenAIClient, defaultModel, req, messages }) {
+export async function dispatchProvider({ defaultModel, req, messages }) {
   const { provider, model, apiKey, endpoint } = readProviderFromHeaders(req);
 
+  // HTTP passthrough provider requires an endpoint
   if (provider === PROVIDERS.HTTP && endpoint) {
     return httpChat({ endpoint, model, messages });
   }
 
-  if (provider === PROVIDERS.OPENAI && apiKey) {
+  // OpenAI provider requires a per-request API key.
+  // Treat missing provider as OpenAI if an API key is supplied.
+  if ((provider === PROVIDERS.OPENAI || !provider) && apiKey) {
     const client = makeOpenAIClient(apiKey);
     if (!client) throw new Error('Invalid OpenAI API key.');
     return openaiChat({ client, model: model || defaultModel, messages });
   }
 
-  if (!defaultOpenAIClient) throw new Error('Server is not configured with an OpenAI key. Please provide one in the request headers.');
-  return openaiChat({ client: defaultOpenAIClient, model: defaultModel, messages });
+  // No server-side default API key. Require explicit credentials per request.
+  throw new Error('Missing provider credentials. Provide x-llm-provider=openai with x-llm-api-key, or x-llm-provider=http with x-llm-endpoint.');
 }
