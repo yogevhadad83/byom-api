@@ -11,7 +11,7 @@ npm start
 
 Server starts on PORT (default 3000) and exposes:
 - GET `/` → health check: `chat-hub alive`
-- POST `/chat` → accepts `{ messages }` or `{ prompt }` and optional `{ userId }`
+- POST `/chat` → accepts `{ messages }` or `{ prompt }` or a full `{ conversation }` snapshot and required `{ userId }`
 - POST `/register-provider` → register per-user provider config (in-memory, 24h TTL)
 - GET `/provider/:userId` → fetch masked provider config
 - DELETE `/provider` → delete stored provider config
@@ -40,6 +40,29 @@ Option B — via per-user registration:
 	- For `openai`, `config.apiKey` is required (model optional)
 	- For `http`, `config.endpoint` is required (model optional)
 2) Then call POST `/chat` with body `{ userId, messages:[...] }` (or set header `x-user-id`)
+
+Conversation snapshot and response meta
+
+You can also submit a conversation snapshot in the request body, for example:
+
+```json
+{
+	"userId": "alice",
+	"conversation": [
+		{ "author": "Alice", "role": "user", "text": "Hi", "ts": 1690000000000 },
+		{ "author": "Assistant", "role": "assistant", "text": "Hello!", "ts": 1690000001000 }
+	],
+	"prompt": "What's a good next reply?"
+}
+```
+
+When a `conversation` array is supplied the server will convert it into a single user message containing the lines `"Author: text"` and forward it to the configured provider along with any `systemPrompt` from the per-user provider config.
+
+Responses include the model id used by the provider in `meta.modelId`, e.g.:
+
+```json
+{ "ok": true, "reply": "...assistant text...", "meta": { "modelId": "gpt-4o-mini" } }
+```
 
 Provider configs are stored only in memory with a 24h TTL and purged about every 10 minutes. This is for POC usage only.
 

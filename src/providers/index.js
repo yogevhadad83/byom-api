@@ -11,17 +11,20 @@ export function readProviderFromHeaders(req) {
 }
 
 export async function dispatchProvider({ defaultModel, req, messages, overrideConfig }) {
-  // Prefer explicit override config if provided
+  // If an explicit overrideConfig is provided, prefer it and bypass header reading
   if (overrideConfig && typeof overrideConfig === 'object') {
     const provider = String(overrideConfig.provider || '').toLowerCase();
     const model = overrideConfig.model || defaultModel;
     if (provider === PROVIDERS.HTTP && String(overrideConfig.endpoint || '')) {
-      return httpChat({ endpoint: overrideConfig.endpoint, model, messages });
+      const out = await httpChat({ endpoint: overrideConfig.endpoint, model, messages });
+      // Ensure we return { text, meta }
+      return typeof out === 'string' ? { text: out, meta: { modelId: model } } : out;
     }
     if (provider === PROVIDERS.OPENAI && String(overrideConfig.apiKey || '')) {
       const client = makeOpenAIClient(overrideConfig.apiKey);
       if (!client) throw new Error('Invalid OpenAI API key.');
-      return openaiChat({ client, model, messages });
+      const out = await openaiChat({ client, model, messages });
+      return out;
     }
     // fallthrough to header-based if overrideConfig incomplete
   }
@@ -30,7 +33,8 @@ export async function dispatchProvider({ defaultModel, req, messages, overrideCo
 
   // HTTP passthrough provider requires an endpoint
   if (provider === PROVIDERS.HTTP && endpoint) {
-    return httpChat({ endpoint, model, messages });
+    const out = await httpChat({ endpoint, model, messages });
+    return typeof out === 'string' ? { text: out, meta: { modelId: model } } : out;
   }
 
   // OpenAI provider requires a per-request API key.
@@ -38,7 +42,8 @@ export async function dispatchProvider({ defaultModel, req, messages, overrideCo
   if ((provider === PROVIDERS.OPENAI || !provider) && apiKey) {
     const client = makeOpenAIClient(apiKey);
     if (!client) throw new Error('Invalid OpenAI API key.');
-    return openaiChat({ client, model: model || defaultModel, messages });
+    const out = await openaiChat({ client, model: model || defaultModel, messages });
+    return out;
   }
 
   // No server-side default API key. Require explicit credentials per request.

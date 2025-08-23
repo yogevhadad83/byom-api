@@ -48,6 +48,7 @@ describe('chat fallback and overrides', () => {
       .set('x-llm-model', 'b')
       .set('Content-Type', 'application/json');
     expect(res.status).toBe(200);
-    expect(String(res.body.reply)).toMatch(/^mock-http:https:\/\/example.test\/b:b:hi$/);
+  // Per new behavior the per-user registered provider config is used (headers are ignored for /chat)
+  expect(String(res.body.reply)).toMatch(/^mock-http:https:\/\/example.test\/a:a:hi$/);
   });
 });

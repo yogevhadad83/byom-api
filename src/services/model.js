@@ -4,11 +4,28 @@ import { getProvider } from './agent.js';
 
 export async function callModel(messages, req, opts = {}) {
   try {
-    // First try header-supplied credentials
+    // Basic safety: cap messages to last 100 and cap total content length to ~8000 chars
+    let safeMessages = Array.isArray(messages) ? messages.slice() : [];
+    if (safeMessages.length > 100) safeMessages = safeMessages.slice(-100);
+    // simple total length cap: keep trimming from start until under limit
+    const MAX_CHARS = 8000;
+    function totalLen(msgs) {
+      return msgs.reduce((s, m) => s + String(m.content || '').length, 0);
+    }
+    while (totalLen(safeMessages) > MAX_CHARS && safeMessages.length > 1) {
+      safeMessages.shift();
+    }
+
+    // First try header-supplied credentials if no explicit overrideConfig passed
     const hdr = readProviderFromHeaders(req);
     const hasHeaderCfg = Boolean((hdr.provider && (hdr.apiKey || hdr.endpoint)) || hdr.apiKey || hdr.endpoint);
+    if (opts.overrideConfig && typeof opts.overrideConfig === 'object') {
+      const out = await dispatchProvider({ defaultModel: DEFAULT_MODEL, req, messages: safeMessages, overrideConfig: opts.overrideConfig });
+      return out;
+    }
+
     if (hasHeaderCfg) {
-      const reply = await dispatchProvider({ defaultModel: DEFAULT_MODEL, req, messages });
+      const reply = await dispatchProvider({ defaultModel: DEFAULT_MODEL, req, messages: safeMessages });
       return reply;
     }
 
@@ -19,7 +36,7 @@ export async function callModel(messages, req, opts = {}) {
     if (userId) {
       const cfg = getProvider(userId);
       if (cfg) {
-        const reply = await dispatchProvider({ defaultModel: DEFAULT_MODEL, req, messages, overrideConfig: cfg });
+        const reply = await dispatchProvider({ defaultModel: DEFAULT_MODEL, req, messages: safeMessages, overrideConfig: cfg });
         return reply;
       }
     }
@@ -34,7 +51,7 @@ export async function callModel(messages, req, opts = {}) {
     const statusNum = Number(rawStatus);
     const errName = String(err?.name || '');
     const errType = String(err?.type || err?.error?.type || '');
-    const quotaHit = (
+  const quotaHit = (
       statusNum === 429 || /rate[-_ ]?limit/i.test(errName) || /rate[-_ ]?limit/i.test(errType) ||
       /insufficient[_-]?quota/i.test(errType) || /insufficient[_-]?quota/i.test(msg) ||
       /exceeded your current quota/i.test(msg) || /quota/i.test(msg)

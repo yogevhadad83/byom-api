@@ -13,5 +13,6 @@ export function makeOpenAIClient(apiKey) {
 // Call OpenAI chat completions API and return first message content.
 export async function openaiChat({ client, model, messages }) {
   const completion = await client.chat.completions.create({ model, messages });
-  return completion.choices?.[0]?.message?.content ?? '(no content)';
+  const text = completion.choices?.[0]?.message?.content ?? '(no content)';
+  return { text, meta: { modelId: model } };
 }
