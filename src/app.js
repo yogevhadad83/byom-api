@@ -6,20 +6,26 @@ import providerRouter from './routes/provider.js';
 
 const app = express();
 
-// Strict CORS for the UI origin and explicit preflight handling
-const UI_ORIGIN = 'https://chat-hub-ui.onrender.com';
+// CORS: allow specific UI origins, limit methods/headers, and handle global preflights with 204
+const ALLOWED_ORIGINS = [
+	'https://byom-chat.onrender.com',
+	'https://chat-hub-ui.onrender.com',
+	'http://localhost:5173',
+	'http://127.0.0.1:5173'
+];
+
 const corsOptions = {
-	origin: [UI_ORIGIN],
+	origin: ALLOWED_ORIGINS,
 	methods: ['GET', 'POST', 'OPTIONS'],
-	allowedHeaders: [
-		'Content-Type',
-		'x-llm-provider', 'x-llm-model', 'x-llm-api-key', 'x-llm-endpoint', 'x-user-id'
-	],
-	credentials: false
+	allowedHeaders: ['Content-Type', 'Authorization'],
+	credentials: false,
+	// Explicitly set success status for legacy clients; default is 204
+	optionsSuccessStatus: 204,
+	preflightContinue: false
 };
 
 app.use(cors(corsOptions));
-// respond to preflight for all routes
+// Respond to preflight for all routes (204)
 app.options('*', cors(corsOptions));
 
 app.use(express.json());
