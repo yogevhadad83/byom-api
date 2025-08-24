@@ -10,7 +10,7 @@ npm start
 ```
 
 Server starts on PORT (default 3000) and exposes:
-- GET `/` → health check: `chat-hub alive`
+- GET `/` → health check: `byom-api alive`
 - POST `/chat` → accepts `{ messages }` or `{ prompt }` or a full `{ conversation }` snapshot and required `{ userId }`
 - POST `/register-provider` → register per-user provider config (in-memory, 24h TTL)
 - GET `/provider/:userId` → fetch masked provider config

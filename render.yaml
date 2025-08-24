@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: chat-hub
+    name: byom-api
     env: node
     region: oregon            # pick your closest region
     plan: free

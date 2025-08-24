@@ -5,11 +5,11 @@ import app from '../src/app.js';
 // Helper: small sleep
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-describe('chat-hub basic', () => {
+describe('byom-api basic', () => {
   it('health endpoint works', async () => {
     const res = await request(app).get('/');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('chat-hub alive');
+  expect(res.text).toContain('byom-api alive');
   });
 
   it('register-provider validation', async () => {

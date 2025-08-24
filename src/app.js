@@ -9,7 +9,7 @@ const app = express();
 // CORS: allow specific UI origins, limit methods/headers, and handle global preflights with 204
 const ALLOWED_ORIGINS = [
 	'https://byom-chat.onrender.com',
-	'https://chat-hub-ui.onrender.com',
+	'https://byom-api-ui.onrender.com',
 	'http://localhost:5173',
 	'http://127.0.0.1:5173'
 ];
