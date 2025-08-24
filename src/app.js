@@ -28,7 +28,16 @@ app.use(cors(corsOptions));
 // Respond to preflight for all routes (204)
 app.options('*', cors(corsOptions));
 
+
 app.use(express.json());
+
+// Simple built-in health endpoints (in case healthRouter isn't mounted as expected)
+app.get('/health', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+app.get('/healthz', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
 
 app.use('/', healthRouter);
 app.use('/', chatRouter);
