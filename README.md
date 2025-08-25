@@ -13,7 +13,7 @@ Server starts on PORT (default 3000) and exposes:
 - GET `/` → health check: `byom-api alive`
 - POST `/chat` → accepts `{ messages }` or `{ prompt }` or a full `{ conversation }` snapshot
 - POST `/register-provider` → register per-user provider config
-- GET `/provider/:userId` → fetch masked provider config
+- GET `/provider` (auth) → fetch masked provider config for current user
 - DELETE `/provider` → delete stored provider config
 
 ## Environment variables
@@ -113,7 +113,7 @@ Responses include the model id used by the provider in `meta.modelId`, e.g.:
 { "ok": true, "reply": "...assistant text...", "meta": { "modelId": "gpt-4o-mini" } }
 ```
 
-Provider configs are stored only in memory with a 24h TTL and purged about every 10 minutes. This is for POC usage only.
+Provider configs are persisted per-user in Supabase and mirrored in-memory with a 24h TTL for legacy fallback. This is for POC usage only.
 
 ## Error behavior
 Quota/rate-limit errors are normalized to:

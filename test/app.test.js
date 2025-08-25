@@ -30,7 +30,10 @@ describe('byom-api basic', () => {
     expect(reg.status).toBe(200);
     expect(reg.body.ok).toBe(true);
 
-    const get = await request(app).get(`/provider/${id}`);
+    const get = await request(app)
+      .get('/provider')
+      .send({ userId: id })
+      .set('Content-Type', 'application/json');
     expect(get.status).toBe(200);
     expect(get.body.ok).toBe(true);
     expect(get.body.provider.apiKey).toMatch(/^sk-\*\*\*\*[a-zA-Z0-9]{4}$/);

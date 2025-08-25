@@ -4,7 +4,10 @@ import app from '../src/app.js';
 
 describe('provider routes', () => {
   it('returns 404 for unknown user provider', async () => {
-    const res = await request(app).get('/provider/nope-user');
+    const res = await request(app)
+      .get('/provider')
+      .send({ userId: 'nope-user' })
+      .set('Content-Type', 'application/json');
     expect(res.status).toBe(404);
     expect(res.body.ok).toBe(false);
   });
@@ -17,7 +20,10 @@ describe('provider routes', () => {
       .set('Content-Type', 'application/json');
     expect(reg.status).toBe(200);
 
-    const get = await request(app).get(`/provider/${id}`);
+    const get = await request(app)
+      .get('/provider')
+      .send({ userId: id })
+      .set('Content-Type', 'application/json');
     expect(get.status).toBe(200);
     expect(get.body.ok).toBe(true);
     expect(get.body.provider.provider).toBe('http');

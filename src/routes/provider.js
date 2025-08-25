@@ -56,12 +56,39 @@ router.post('/register-provider', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/provider/:userId', (req, res) => {
-  const id = String(req.params.userId || '').trim();
-  if (!id) return res.status(400).json({ ok: false, error: 'userId param is required' });
-  const cfg = getProvider(id);
-  if (!cfg) return res.status(404).json({ ok: false, error: 'No provider configured for this user.' });
-  return res.json({ ok: true, provider: mask(cfg) });
+// Fetch provider config for current authenticated user
+router.get('/provider', requireAuth, async (req, res) => {
+  try {
+    const supabase = req.supabase;
+    const user = req.user;
+
+    let prov = null;
+    try {
+      const { data, error } = await supabase
+        .from('providers')
+        .select('provider, config')
+        .eq('user_id', user.id)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      if (data) prov = data;
+    } catch (dbErr) {
+      // eslint-disable-next-line no-console
+      console.warn('DB fetch failed; will try in-memory agent:', dbErr?.message || dbErr);
+    }
+
+    if (!prov) {
+      const mem = getProvider(user.id);
+      if (mem) prov = { provider: mem.provider, config: { apiKey: mem.apiKey, model: mem.model, endpoint: mem.endpoint, systemPrompt: mem.systemPrompt } };
+    }
+
+    if (!prov) return res.status(404).json({ ok: false, error: 'No provider configured for this user.' });
+
+    const masked = mask({ provider: prov.provider, ...(prov.config || {}) });
+    return res.json({ ok: true, provider: masked });
+  } catch (e) {
+    const status = Number(e?.status || 500) || 500;
+    return res.status(status).json({ ok: false, error: String(e?.message || e) });
+  }
 });
 
 router.delete('/provider', (req, res) => {
