@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import { PROVIDERS } from '../config.js';
 import { setProvider, getProvider, deleteProvider, mask } from '../services/agent.js';
+import supabaseAuth from '../supabaseAuth.js';
 
 const router = Router();
 
-router.post('/register-provider', (req, res) => {
+// Protected: register or update provider config stored in Supabase (RLS enforces user scope)
+router.post('/register-provider', supabaseAuth(), async (req, res) => {
   try {
-    const { userId, provider, config } = req.body || {};
-    const id = String(userId || '').trim();
+    const { provider, config } = req.body || {};
     const prov = String(provider || '').trim().toLowerCase();
-    if (!id) return res.status(400).json({ ok: false, error: 'userId is required' });
     if (prov !== PROVIDERS.OPENAI && prov !== PROVIDERS.HTTP) {
       return res.status(400).json({ ok: false, error: `provider must be one of: ${PROVIDERS.OPENAI}, ${PROVIDERS.HTTP}` });
     }
@@ -22,7 +22,25 @@ router.post('/register-provider', (req, res) => {
     if (prov === PROVIDERS.HTTP && !String(config.endpoint || '').trim()) {
       return res.status(400).json({ ok: false, error: 'config.endpoint is required for http' });
     }
-    setProvider(id, { provider: prov, ...config });
+
+    const supabase = req.supabase;
+    const user = req.user;
+
+    const { error } = await supabase
+      .from('providers')
+      .upsert({
+        user_id: user.id,
+        provider: prov,
+        config,
+        updated_at: new Date().toISOString(),
+      });
+    if (error) return res.status(400).json({ ok: false, error: error.message || String(error) });
+
+    // Maintain legacy in-memory store for compatibility (GET/DELETE and some tests)
+    try {
+      setProvider(user.id, { provider: prov, ...config });
+    } catch {}
+
     return res.json({ ok: true });
   } catch (e) {
     const status = Number(e?.status || 500) || 500;

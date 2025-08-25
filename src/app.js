@@ -6,26 +6,22 @@ import providerRouter from './routes/provider.js';
 
 const app = express();
 
-// CORS: allow specific UI origins, limit methods/headers, and handle global preflights with 204
-const ALLOWED_ORIGINS = [
-	'https://byom-chat.onrender.com',
-	'https://byom-api-ui.onrender.com',
-	'http://localhost:5173',
-	'http://127.0.0.1:5173'
-];
+// CORS from env: CORS_ORIGIN="a,b,c" or fallback to true (allow all)
+const allowed = String(process.env.CORS_ORIGIN || '')
+	.split(',')
+	.map(s => s.trim())
+	.filter(Boolean);
 
 const corsOptions = {
-	origin: ALLOWED_ORIGINS,
+	origin: allowed.length ? allowed : true,
 	methods: ['GET', 'POST', 'OPTIONS'],
 	allowedHeaders: ['Content-Type', 'Authorization'],
 	credentials: false,
-	// Explicitly set success status for legacy clients; default is 204
 	optionsSuccessStatus: 204,
-	preflightContinue: false
+	preflightContinue: false,
 };
 
 app.use(cors(corsOptions));
-// Respond to preflight for all routes (204)
 app.options('*', cors(corsOptions));
 
 

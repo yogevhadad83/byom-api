@@ -10,6 +10,4 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: MOCK
-        value: "1"           # keep free until you enable billing
     healthCheckPath: /
