@@ -16,15 +16,21 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import type { Response, NextFunction } from 'express';
+import type { AuthedRequest } from './auth.js';
 
-function getEnv(name) {
+function getEnv(name: string): string | null {
   const v = process.env[name];
   if (!v || String(v).trim() === '') return null;
   return v;
 }
 
 export default function supabaseAuth() {
-  return async function supabaseAuthMiddleware(req, res, next) {
+  return async function supabaseAuthMiddleware(
+    req: AuthedRequest,
+    res: Response,
+    next: NextFunction,
+  ) {
     try {
       const authHeader = req.get('authorization') || req.get('Authorization') || '';
       const parts = authHeader.split(' ');
@@ -54,7 +60,7 @@ export default function supabaseAuth() {
             };
           },
           auth: { getUser: async () => ({ data: { user: { id: fakeUserId } }, error: null }) },
-        };
+        } as any;
         return next();
       }
 

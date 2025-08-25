@@ -1,12 +1,12 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { PROVIDERS } from '../config.js';
 import { setProvider, getProvider, deleteProvider, mask } from '../services/agent.js';
-import { requireAuth } from '../auth.js';
+import { requireAuth, type AuthedRequest } from '../auth.js';
 
 const router = Router();
 
 // Protected: register or update provider config stored in Supabase (RLS enforces user scope)
-router.post('/register-provider', requireAuth, async (req, res) => {
+router.post('/register-provider', requireAuth, async (req: AuthedRequest, res: Response) => {
   try {
     const { provider, config } = req.body || {};
     const prov = String(provider || '').trim().toLowerCase();

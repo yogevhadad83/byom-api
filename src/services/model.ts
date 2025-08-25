@@ -1,8 +1,9 @@
+import type { Request } from 'express';
 import { MODEL as DEFAULT_MODEL } from '../config.js';
 import { dispatchProvider, readProviderFromHeaders } from '../providers/index.js';
 import { getProvider } from './agent.js';
 
-export async function callModel(messages, req, opts = {}) {
+export async function callModel(messages: any, req: Request, opts: any = {}) {
   try {
     // Basic safety: cap messages to last 100 and cap total content length to ~8000 chars
     let safeMessages = Array.isArray(messages) ? messages.slice() : [];
@@ -42,7 +43,7 @@ export async function callModel(messages, req, opts = {}) {
     }
 
     // No usable config found
-    const err = new Error('No provider configured for this user. Register a provider first.');
+    const err: any = new Error('No provider configured for this user. Register a provider first.');
     err.status = 400;
     throw err;
   } catch (err) {

@@ -1,13 +1,13 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { callModel } from '../services/model.js';
 import agent from '../services/agent.js';
-import { requireAuth } from '../auth.js';
+import { requireAuth, type AuthedRequest } from '../auth.js';
 
 const router = Router();
 
 // POST /chat
 // Accepts multiple input shapes: prompt, messages (OpenAI style), or conversation snapshot.
-router.post('/chat', requireAuth, async (req, res) => {
+router.post('/chat', requireAuth, async (req: AuthedRequest, res: Response) => {
   try {
     const body = req.body ?? {};
     const { conversationId, prompt, conversation, messages } = body;

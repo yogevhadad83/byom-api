@@ -10,7 +10,7 @@ export function readProviderFromHeaders(req) {
   return { provider, model, apiKey, endpoint };
 }
 
-export async function dispatchProvider({ defaultModel, req, messages, overrideConfig }) {
+export async function dispatchProvider({ defaultModel, req, messages, overrideConfig = null }) {
   // If an explicit overrideConfig is provided, prefer it and bypass header reading
   if (overrideConfig && typeof overrideConfig === 'object') {
     const provider = String(overrideConfig.provider || '').toLowerCase();
