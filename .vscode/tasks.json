@@ -4,14 +4,14 @@
 		{
 			"label": "Start byom-api server (smoke)",
 			"type": "shell",
-			"command": "node src/index.js",
+			"command": "npm run build && node dist/index.js",
 			"isBackground": true,
 			"group": "build"
 		},
 		{
 			"label": "Restart byom-api server",
 			"type": "shell",
-			"command": "node src/index.js",
+			"command": "npm run build && node dist/index.js",
 			"isBackground": true,
 			"group": "build"
 		}

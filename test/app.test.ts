@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { describe, it, expect, beforeEach } from 'vitest';
-import app from '../src/app.js';
+import app from '../dist/app.js';
 
 // Helper: small sleep
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

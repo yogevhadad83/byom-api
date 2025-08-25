@@ -2,19 +2,19 @@ import request from 'supertest';
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 
 // Mock provider calls to avoid real network
-vi.mock('../src/providers/openai.js', async () => {
+vi.mock('../dist/providers/openai.js', async () => {
   return {
     makeOpenAIClient: (key) => ({ key }),
     openaiChat: async ({ client, model, messages }) => `mock-openai:${client.key}:${model}:${messages?.[0]?.content ?? ''}`,
   };
 });
-vi.mock('../src/providers/http.js', async () => {
+vi.mock('../dist/providers/http.js', async () => {
   return {
     httpChat: async ({ endpoint, model, messages }) => `mock-http:${endpoint}:${model}:${messages?.[0]?.content ?? ''}`,
   };
 });
 
-import app from '../src/app.js';
+import app from '../dist/app.js';
 
 describe('chat fallback and overrides', () => {
   it('uses agent config when headers absent', async () => {
