@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { describe, it, expect } from 'vitest';
-import app from '../src/app.js';
+import app from '../dist/app.js';
 
 describe('provider routes', () => {
   it('returns 404 for unknown user provider', async () => {

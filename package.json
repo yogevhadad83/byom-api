@@ -4,10 +4,10 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "dev": "npm run build && node dist/index.js",
-    "start": "node dist/index.js",
-    "test": "NODE_ENV=test vitest --run",
-    "coverage": "NODE_ENV=test vitest --run --coverage"
+  "dev": "npm run build && node dist/index.js",
+  "start": "npm run build && node dist/index.js",
+  "test": "npm run build && NODE_ENV=test vitest --run",
+  "coverage": "npm run build && NODE_ENV=test vitest --run --coverage"
   },
   "dependencies": {
   "@supabase/supabase-js": "^2.45.4",
