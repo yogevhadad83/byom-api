@@ -1,18 +1,18 @@
 import { Router } from 'express';
 import { callModel } from '../services/model.js';
 import agent from '../services/agent.js';
-import supabaseAuth from '../supabaseAuth.js';
+import { requireAuth } from '../auth.js';
 
 const router = Router();
 
 // POST /chat
 // Accepts multiple input shapes: prompt, messages (OpenAI style), or conversation snapshot.
-router.post('/chat', supabaseAuth(), async (req, res) => {
+router.post('/chat', requireAuth, async (req, res) => {
   try {
     const body = req.body ?? {};
     const { conversationId, prompt, conversation, messages } = body;
-    const supabase = req.supabase;
-    const user = req.user;
+  const supabase = req.supabase;
+  const user = req.user;
 
     // Validation
     if (!prompt && !conversation && !messages) {
@@ -67,18 +67,25 @@ router.post('/chat', supabaseAuth(), async (req, res) => {
     }
 
     // Fetch provider config for current user via RLS-protected table
-    const { data: prov, error } = await supabase
-      .from('providers')
-      .select('provider, config')
-      .eq('user_id', user.id)
-      .single();
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116: No rows found on single()
-      return res.status(400).json({ ok: false, error: error.message || String(error) });
+    let prov = null;
+    try {
+      const { data, error } = await supabase
+        .from('providers')
+        .select('provider, config')
+        .eq('user_id', user.id)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      if (data) prov = data;
+    } catch (dbErr) {
+      // eslint-disable-next-line no-console
+      console.warn('DB fetch failed; will try in-memory agent:', dbErr?.message || dbErr);
     }
+
     if (!prov) {
-      return res.status(400).json({ ok: false, error: 'No provider configured for this user. Register a provider first.' });
+      const mem = agent.getProvider(user.id);
+      if (mem) prov = { provider: mem.provider, config: { apiKey: mem.apiKey, model: mem.model, endpoint: mem.endpoint, systemPrompt: mem.systemPrompt } };
     }
+    if (!prov) return res.status(400).json({ ok: false, error: 'No provider configured for this user. Register a provider first.' });
 
     if (!conversation && !messages && !prompt) {
       return res.status(400).json({ ok: false, error: 'Either conversation or messages or prompt is required' });
@@ -102,7 +109,10 @@ router.post('/chat', supabaseAuth(), async (req, res) => {
       endpoint: providerCfg.endpoint,
     };
 
-    const result = await callModel(outMessages, req, { userId: user.id, overrideConfig });
+  const result = await callModel(outMessages, req, { userId: user.id, overrideConfig });
+
+  // Log user and provider (no secrets)
+  try { console.log('chat', { userId: user.id, provider: providerCfg.provider }); } catch {}
 
     // callModel may return either a string (reply) or an object { text, meta }
     const modelId = providerCfg?.model ?? null;

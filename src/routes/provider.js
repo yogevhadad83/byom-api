@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { PROVIDERS } from '../config.js';
 import { setProvider, getProvider, deleteProvider, mask } from '../services/agent.js';
-import supabaseAuth from '../supabaseAuth.js';
+import { requireAuth } from '../auth.js';
 
 const router = Router();
 
 // Protected: register or update provider config stored in Supabase (RLS enforces user scope)
-router.post('/register-provider', supabaseAuth(), async (req, res) => {
+router.post('/register-provider', requireAuth, async (req, res) => {
   try {
     const { provider, config } = req.body || {};
     const prov = String(provider || '').trim().toLowerCase();
@@ -25,23 +25,31 @@ router.post('/register-provider', supabaseAuth(), async (req, res) => {
 
     const supabase = req.supabase;
     const user = req.user;
-
-    const { error } = await supabase
-      .from('providers')
-      .upsert({
-        user_id: user.id,
-        provider: prov,
-        config,
-        updated_at: new Date().toISOString(),
-      });
-    if (error) return res.status(400).json({ ok: false, error: error.message || String(error) });
+    let dbOk = false;
+    try {
+      const { error } = await supabase
+        .from('providers')
+        .upsert({
+          user_id: user.id,
+          provider: prov,
+          config,
+          updated_at: new Date().toISOString(),
+        });
+      if (error) throw error;
+      dbOk = true;
+    } catch (dbErr) {
+      // eslint-disable-next-line no-console
+      console.warn('DB upsert failed; falling back to memory:', dbErr?.message || dbErr);
+    }
 
     // Maintain legacy in-memory store for compatibility (GET/DELETE and some tests)
     try {
       setProvider(user.id, { provider: prov, ...config });
     } catch {}
 
-    return res.json({ ok: true });
+    // Log user and provider type (no secrets)
+    try { console.log('register-provider', { userId: user.id, provider: prov, persisted: dbOk }); } catch {}
+    return res.json({ ok: true, persisted: dbOk });
   } catch (e) {
     const status = Number(e?.status || 500) || 500;
     return res.status(status).json({ ok: false, error: String(e?.message || e) });
