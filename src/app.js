@@ -13,12 +13,12 @@ const allowed = String(process.env.CORS_ORIGIN || '')
 	.filter(Boolean);
 
 const corsOptions = {
-	origin: allowed.length ? allowed : true,
-	methods: ['GET', 'POST', 'OPTIONS'],
-	allowedHeaders: ['Content-Type', 'Authorization'],
-	credentials: false,
-	optionsSuccessStatus: 204,
-	preflightContinue: false,
+  origin: allowed.length ? allowed : true,
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false,
+  optionsSuccessStatus: 204,
+  preflightContinue: false,
 };
 
 app.use(cors(corsOptions));

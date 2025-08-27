@@ -91,12 +91,31 @@ router.get('/provider', requireAuth, async (req, res) => {
   }
 });
 
-router.delete('/provider', (req, res) => {
-  const { userId } = req.body || {};
-  const id = String(userId || '').trim();
-  if (!id) return res.status(400).json({ ok: false, error: 'userId is required' });
-  const deleted = deleteProvider(id);
-  return res.json({ ok: true, deleted: Boolean(deleted) });
+router.delete('/provider', requireAuth, async (req, res) => {
+  try {
+    const supabase = req.supabase;
+    const user = req.user;
+
+    let dbOk = false;
+    try {
+      const { error } = await supabase
+        .from('providers')
+        .delete()
+        .eq('user_id', user.id);
+      if (error) throw error;
+      dbOk = true;
+    } catch (dbErr) {
+      // eslint-disable-next-line no-console
+      console.warn('DB delete failed; will still clear in-memory:', dbErr?.message || dbErr);
+    }
+
+    const deleted = deleteProvider(user.id);
+    try { console.log('delete-provider', { userId: user.id, persisted: dbOk, memoryCleared: Boolean(deleted) }); } catch {}
+    return res.json({ ok: true });
+  } catch (e) {
+    const status = Number(e?.status || 500) || 500;
+    return res.status(status).json({ ok: false, error: String(e?.message || e) });
+  }
 });
 
 export default router;
