@@ -56,20 +56,66 @@ router.post('/register-provider', requireAuth, async (req: AuthedRequest, res: R
   }
 });
 
-router.get('/provider/:userId', (req, res) => {
-  const id = String(req.params.userId || '').trim();
-  if (!id) return res.status(400).json({ ok: false, error: 'userId param is required' });
-  const cfg = getProvider(id);
-  if (!cfg) return res.status(404).json({ ok: false, error: 'No provider configured for this user.' });
-  return res.json({ ok: true, provider: mask(cfg) });
+// GET /provider (auth): fetch current user's provider from DB, fallback to memory
+router.get('/provider', requireAuth, async (req: AuthedRequest, res: Response) => {
+  try {
+    const supabase = req.supabase!;
+    const user = req.user!;
+
+    let prov: any = null;
+    try {
+      const { data, error } = await supabase
+        .from('providers')
+        .select('provider, config')
+        .eq('user_id', user.id)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      if (data) prov = data;
+    } catch (dbErr: any) {
+      // eslint-disable-next-line no-console
+      console.warn('DB fetch failed; trying in-memory fallback:', dbErr?.message || dbErr);
+    }
+
+    if (!prov) {
+      const mem = getProvider(user.id);
+      if (mem) {
+        const masked = mask(mem);
+        return res.json({ ok: true, provider: { provider: masked.provider, config: { apiKey: masked.apiKey, model: masked.model, endpoint: masked.endpoint, systemPrompt: masked.systemPrompt } } });
+      }
+      return res.status(404).json({ ok: false, error: 'No provider configured for this user.' });
+    }
+
+    const masked = mask({ provider: prov.provider, ...prov.config });
+    return res.json({ ok: true, provider: { provider: masked.provider, config: { apiKey: masked.apiKey, model: masked.model, endpoint: masked.endpoint, systemPrompt: masked.systemPrompt } } });
+  } catch (e: any) {
+    const status = Number(e?.status || 500) || 500;
+    return res.status(status).json({ ok: false, error: String(e?.message || e) });
+  }
 });
 
-router.delete('/provider', (req, res) => {
-  const { userId } = req.body || {};
-  const id = String(userId || '').trim();
-  if (!id) return res.status(400).json({ ok: false, error: 'userId is required' });
-  const deleted = deleteProvider(id);
-  return res.json({ ok: true, deleted: Boolean(deleted) });
+// DELETE /provider (auth): delete current user's row from DB and clear memory
+router.delete('/provider', requireAuth, async (req: AuthedRequest, res: Response) => {
+  try {
+    const supabase = req.supabase!;
+    const user = req.user!;
+    let dbOk = false;
+    try {
+      const { error } = await supabase
+        .from('providers')
+        .delete()
+        .eq('user_id', user.id);
+      if (error) throw error;
+      dbOk = true;
+    } catch (dbErr: any) {
+      // eslint-disable-next-line no-console
+      console.warn('DB delete failed; still clearing memory:', dbErr?.message || dbErr);
+    }
+    try { deleteProvider(user.id); } catch {}
+    return res.json({ ok: true, deleted: dbOk });
+  } catch (e: any) {
+    const status = Number(e?.status || 500) || 500;
+    return res.status(status).json({ ok: false, error: String(e?.message || e) });
+  }
 });
 
 export default router;
